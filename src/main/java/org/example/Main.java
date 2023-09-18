@@ -8,6 +8,20 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
         List<Thread> threads = new ArrayList<>();
 
+        Thread printLeaderThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                synchronized (sizeToFreq) {
+                    try {
+                        sizeToFreq.wait();
+                        analyzeResults();
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+            }
+        });
+        printLeaderThread.start();
+
         for (int i = 0; i < 1000; i++) {
             Thread thread = new Thread(() -> {
                 String route = generateRoute("RLRFR", 100);
@@ -15,7 +29,9 @@ public class Main {
                 int countR = charCounter(route, targetChar);
                 synchronized (sizeToFreq) {
                     sizeToFreq.put(countR, sizeToFreq.getOrDefault(countR, 0) + 1);
+                    sizeToFreq.notify();
                 }
+
             });
             threads.add(thread);
             thread.start();
@@ -24,8 +40,7 @@ public class Main {
         for (Thread thread : threads) {
             thread.join();
         }
-
-        analyzeResults();
+        printLeaderThread.interrupt();
 
     }
 
@@ -49,12 +64,6 @@ public class Main {
         System.out.println("Самое частое количество повторений " + mostFrequentSize
                 + " (встретилось " + maxFrequency + " раз)");
 
-        if (!otherSizes.isEmpty()) {
-            System.out.println("Другие размеры:");
-            for (Map.Entry<Integer, Integer> entry : otherSizes.entrySet()) {
-                System.out.println("- " + entry.getKey() + " (" + entry.getValue() + " раз)");
-            }
-        }
     }
 
     public static Integer getKeyByValue(Map<Integer, Integer> map, Integer value) {
